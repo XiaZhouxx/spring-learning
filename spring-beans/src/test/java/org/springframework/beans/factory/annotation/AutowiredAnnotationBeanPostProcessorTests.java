@@ -16,47 +16,12 @@
 
 package org.springframework.beans.factory.annotation;
 
-import java.io.Serializable;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanNameAware;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.InjectionPoint;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
-import org.springframework.beans.factory.ObjectFactory;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.UnsatisfiedDependencyException;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.TypedStringValue;
@@ -74,6 +39,20 @@ import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 import org.springframework.core.annotation.Order;
 import org.springframework.core.testfixture.io.SerializationTestUtils;
 import org.springframework.util.ReflectionUtils;
+
+import java.io.Serializable;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.*;
+import java.util.concurrent.Callable;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
@@ -123,6 +102,7 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
 		bf.registerBeanDefinition("annotatedBean", bd);
 		TestBean tb = new TestBean();
+		tb.setAge(18);
 		bf.registerSingleton("testBean", tb);
 
 		ResourceInjectionBean bean = (ResourceInjectionBean) bf.getBean("annotatedBean");
@@ -132,6 +112,22 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		bean = (ResourceInjectionBean) bf.getBean("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(tb);
 		assertThat(bean.getTestBean2()).isSameAs(tb);
+	}
+
+	/**
+	 * 测试BeanDefinition 覆盖配置 allowBeanDefinitionOverriding
+	 */
+	@Test
+	public void testBeanDefinitionOverriding() {
+		bf.setAllowBeanDefinitionOverriding(false);
+		RootBeanDefinition bd = new RootBeanDefinition(ResourceInjectionBean.class);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+
+		bf.registerBeanDefinition("testBean" ,bd);
+		RootBeanDefinition bd1 = new RootBeanDefinition(ResourceInjectionBean.class);
+		bd.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+
+		bf.registerBeanDefinition("testBean", bd1);
 	}
 
 	@Test
@@ -194,6 +190,8 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 	public void testExtendedResourceInjectionWithOverriding() {
 		RootBeanDefinition annotatedBd = new RootBeanDefinition(TypedExtendedResourceInjectionBean.class);
 		TestBean tb2 = new TestBean();
+		tb2.setAge(123);
+		// 可以直接操作BeanDefinition中的 属性值，优先级是高于@Autowired注入()
 		annotatedBd.getPropertyValues().add("testBean2", tb2);
 		bf.registerBeanDefinition("annotatedBean", annotatedBd);
 		TestBean tb = new TestBean();
@@ -202,6 +200,7 @@ public class AutowiredAnnotationBeanPostProcessorTests {
 		bf.registerSingleton("nestedTestBean", ntb);
 
 		TypedExtendedResourceInjectionBean bean = (TypedExtendedResourceInjectionBean) bf.getBean("annotatedBean");
+		BeanDefinition annotatedBean = bf.getBeanDefinition("annotatedBean");
 		assertThat(bean.getTestBean()).isSameAs(tb);
 		assertThat(bean.getTestBean2()).isSameAs(tb2);
 		assertThat(bean.getTestBean3()).isSameAs(tb);
